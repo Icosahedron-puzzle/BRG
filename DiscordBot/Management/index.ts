@@ -1,47 +1,43 @@
-import DiscordJS, { Intents } from 'discord.js'
-import dotenv from 'dotenv'
-require('dotenv').config()
+// Require the necessary discord.js classes
+const fs = require('fs');
+const { Client, Collection, Intents } = require('discord.js');
+const { clientId, guildId, token } = require('./config.json');
 
-const client = new DiscordJS.Client({
-    intents: [
-        Intents.FLAGS.GUILDS,
-        Intents.FLAGS.GUILD_MESSAGES
-    ]
-})
+// Create a new client instance
+const client = new Client({ intents: [Intents.FLAGS.GUILDS] });
 
-client.on('ready', () => {
-    console.log('The bot is ready')
-})
+client.commands = new Collection();
+const commandFiles = fs.readdirSync('./Management/commands').filter(file => file.endsWith('.js'));
 
-client.on('messageCreate', (message) => {
-    if (message.content === 'thread') {
-        message.reply({
-            "content": "Test",
-            "embeds": [
-                {
-                    "description": "Below",
-                    "color": 5814783,
-                    "fields": [
-                        {
-                            "name": "Name",
-                            "value": "LittleRayne",
-                            "inline": true
-                        },
-                        {
-                            "name": "Characters",
-                            "value": "GBA\nSun Fac\nSoldier\nSpy\nPoggle",
-                            "inline": true
-                        },
-                        {
-                            "name": "Current Gear",
-                            "value": "G13\nG12\nG12\nG12\nG12",
-                            "inline": true
-                        }
-                    ]
-                }
-            ]
-        })
-    }
-})
+for (const file of commandFiles) {
+	const command = require(`./commands/${file}`);
+	// Set a new item in the Collection
+	// With the key as the command name and the value as the exported module
+	client.commands.set(command.data.name, command);
+}
 
-client.login(process.env.TOKEN)
+// When the client is ready, run this code (only once)
+client.once('ready', () => {
+	console.log('Ready!');
+});
+
+// The following allows the bot to access slash command responses
+client.on('interactionCreate', async interaction => {
+	if (!interaction.isCommand()) return;
+
+	const { commandName } = interaction;
+
+	const command = client.commands.get(interaction.commandName);
+
+	if (!command) return;
+
+	try {
+		await command.execute(interaction);
+	} catch (error) {
+		console.error(error);
+		await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+	}
+});
+
+// Login to Discord with your client's token
+client.login(token);
